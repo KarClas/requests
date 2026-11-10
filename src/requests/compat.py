@@ -14,13 +14,12 @@ from __future__ import annotations
 import importlib
 import sys
 from types import ModuleType
+from typing import TYPE_CHECKING
 
 # -------
 # urllib3
 # -------
-from urllib3 import (
-    __version__ as urllib3_version,  # type: ignore[reportPrivateImportUsage]
-)
+from urllib3 import __version__ as urllib3_version
 
 # Detect which major version of urllib3 is being used.
 try:
@@ -46,7 +45,10 @@ def _resolve_char_detection() -> ModuleType | None:
     return chardet
 
 
-chardet = _resolve_char_detection()
+if TYPE_CHECKING:
+    import chardet
+else:
+    chardet = _resolve_char_detection()
 
 # -------
 # Pythons

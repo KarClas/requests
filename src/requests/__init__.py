@@ -52,7 +52,7 @@ except ImportError:
     charset_normalizer_version = None
 
 try:
-    from chardet import __version__ as chardet_version  # type: ignore[import-not-found]
+    from chardet import __version__ as chardet_version
 except ImportError:
     chardet_version = None
 
@@ -111,13 +111,13 @@ def _check_cryptography(cryptography_version: str) -> None:
 # Check imported dependencies for compatibility.
 try:
     check_compatibility(
-        urllib3.__version__,  # type: ignore[reportPrivateImportUsage]
-        chardet_version,  # type: ignore[reportUnknownArgumentType]
+        urllib3.__version__,
+        chardet_version,
         charset_normalizer_version,
     )
 except (AssertionError, ValueError):
     warnings.warn(
-        f"urllib3 ({urllib3.__version__}) or chardet "  # type: ignore[reportPrivateImportUsage]
+        f"urllib3 ({urllib3.__version__}) or chardet "
         f"({chardet_version})/charset_normalizer ({charset_normalizer_version}) "
         "doesn't match a supported version!",
         RequestsDependencyWarning,
@@ -138,11 +138,11 @@ try:
         pyopenssl.inject_into_urllib3()
 
         # Check cryptography version
-        from cryptography import (  # type: ignore[reportMissingImports]
-            __version__ as cryptography_version,  # type: ignore[reportUnknownVariableType]
+        from cryptography import (
+            __version__ as cryptography_version,
         )
 
-        _check_cryptography(cryptography_version)  # type: ignore[reportUnknownArgumentType]
+        _check_cryptography(cryptography_version)
 except ImportError:
     pass
 

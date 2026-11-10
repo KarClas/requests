@@ -12,7 +12,7 @@ import datetime
 # Import encoding now, to avoid implicit import later.
 # Implicit import within threads may cause LookupError when standard library is in a ZIP,
 # such as in Embedded Python. See https://github.com/psf/requests/issues/3578.
-import encodings.idna  # noqa: F401  # type: ignore[reportUnusedImport]
+import encodings.idna  # noqa: F401
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from io import UnsupportedOperation
 from typing import (
@@ -35,8 +35,8 @@ from urllib3.fields import RequestField
 from urllib3.filepost import encode_multipart_formdata
 from urllib3.util import parse_url
 
+from . import _types as _t
 from ._internal_utils import to_native_string, unicode_is_ascii
-from ._types import SupportsRead as _SupportsRead
 from .auth import HTTPBasicAuth
 from .compat import (
     JSONDecodeError,
@@ -50,7 +50,7 @@ from .compat import (
 )
 from .compat import json as complexjson
 from .cookies import (
-    _copy_cookie_jar,  # type: ignore[reportPrivateUsage]
+    _copy_cookie_jar,
     cookiejar_from_dict,
     get_cookie_header,
 )
@@ -87,7 +87,6 @@ if TYPE_CHECKING:
 
     from typing_extensions import Self
 
-    from . import _types as _t
     from .adapters import HTTPAdapter
     from .cookies import RequestsCookieJar
 
@@ -161,7 +160,7 @@ class RequestEncodingMixin:
 
         if isinstance(data, (str, bytes)):
             return data
-        elif isinstance(data, _SupportsRead):
+        elif _t.has_read(data):
             return data
         elif hasattr(data, "__iter__"):
             result: list[tuple[bytes, bytes]] = []
@@ -236,9 +235,9 @@ class RequestEncodingMixin:
 
             if isinstance(fp, (str, bytes, bytearray)):
                 fdata = fp
-            elif isinstance(fp, _SupportsRead):  # type: ignore[reportUnnecessaryIsInstance]  # defensive check for untyped callers
+            elif _t.has_read(fp):
                 fdata = fp.read()
-            elif fp is None:  # type: ignore[reportUnnecessaryComparison]  # defensive check for untyped callers
+            elif fp is None:  # defensive check for untyped callers
                 continue
             else:
                 fdata = fp
@@ -266,7 +265,9 @@ class RequestHooksMixin:
         if isinstance(hook, Callable):
             self.hooks[event].append(hook)
         elif hasattr(hook, "__iter__"):
-            self.hooks[event].extend(h for h in hook if isinstance(h, Callable))  # type: ignore[reportUnnecessaryIsInstance]  # defensive runtime filter
+            self.hooks[event].extend(
+                h for h in hook if isinstance(h, Callable)
+            )  # defensive runtime filter
 
     def deregister_hook(self, event: str, hook: _t.HookType) -> bool:
         """Deregister a previously registered hook.
@@ -308,9 +309,10 @@ class Request(RequestHooksMixin):
       <PreparedRequest [GET]>
     """
 
+    hooks: dict[str, list[_t.HookType]]
     method: str | None
     url: _t.UriType | None
-    headers: CaseInsensitiveDict[str] | Mapping[str, str | bytes] | None
+    headers: Mapping[str, str | bytes]
     files: _t.FilesType
     data: _t.DataType
     json: _t.JsonType
@@ -322,7 +324,7 @@ class Request(RequestHooksMixin):
         self,
         method: str | None = None,
         url: _t.UriType | None = None,
-        headers: Mapping[str, str | bytes] | None = None,
+        headers: _t.HeadersType = None,
         files: _t.FilesType = None,
         data: _t.DataType = None,
         params: _t.ParamsType = None,
@@ -596,9 +598,9 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
             if not isinstance(body, bytes):
                 body = body.encode("utf-8")
 
-        if isinstance(data, Iterable) and not isinstance(
-            data, (str, bytes, list, tuple, Mapping)
-        ):
+        # data that proxies attributes to underlying objects needs hasattr
+        is_iterable = isinstance(data, Iterable) or hasattr(data, "__iter__")
+        if is_iterable and not isinstance(data, (str, bytes, list, tuple, Mapping)):
             try:
                 length = super_len(data)
             except (TypeError, AttributeError, UnsupportedOperation):
@@ -636,7 +638,7 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
             else:
                 if raw_data:
                     body = self._encode_params(raw_data)
-                    if isinstance(data, basestring) or isinstance(data, _SupportsRead):
+                    if isinstance(data, basestring) or _t.has_read(data):
                         content_type = None
                     else:
                         content_type = "application/x-www-form-urlencoded"
@@ -741,7 +743,7 @@ class Response:
     url: str
     encoding: str | None
     history: list[Response]
-    reason: str | None
+    reason: str
     cookies: RequestsCookieJar
     elapsed: datetime.timedelta
     request: PreparedRequest
@@ -790,7 +792,7 @@ class Response:
         self.history = []
 
         #: Textual reason of responded HTTP Status, e.g. "Not Found" or "OK".
-        self.reason = None
+        self.reason = None  # type: ignore[assignment]
 
         #: A CookieJar of Cookies the server sent back.
         self.cookies = cookiejar_from_dict({})
@@ -955,7 +957,9 @@ class Response:
 
         if self._content_consumed and isinstance(self._content, bool):
             raise StreamConsumedError()
-        elif chunk_size is not None and not isinstance(chunk_size, int):  # type: ignore[reportUnnecessaryIsInstance]  # runtime guard for untyped callers
+        elif chunk_size is not None and not isinstance(
+            chunk_size, int
+        ):  # runtime guard for untyped callers
             raise TypeError(
                 f"chunk_size must be an int, it is instead a {type(chunk_size)}."
             )
@@ -1010,7 +1014,7 @@ class Response:
         ):
             if pending is not None:
                 # TODO: remove cast after iter_lines rewrite
-                chunk = cast("str | bytes", pending + chunk)  # type: ignore[operator]
+                chunk = cast("str | bytes", pending + chunk)
 
             if delimiter:
                 lines = chunk.split(delimiter)  # type: ignore[arg-type]

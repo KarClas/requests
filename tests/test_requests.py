@@ -1087,6 +1087,32 @@ class TestRequests:
             )
         assert r.status_code == 200
 
+    def test_post_named_tempfile(self, httpbin):
+        with tempfile.NamedTemporaryFile(mode="w+") as f:
+            f.write("named temp file contents\n")
+            f.seek(0)
+            r = requests.post(
+                httpbin("post"),
+                files={"file": f},
+            )
+        assert r.status_code == 200
+        assert r.json()["files"]["file"] == "named temp file contents\n"
+
+    def test_post_getattr_proxy_read_only(self, httpbin):
+
+        class ReadProxy:
+            def __init__(self):
+                self._file = io.BytesIO(b"streamed body")
+
+            def __getattr__(self, name):
+                if name == "__iter__":
+                    raise AttributeError(name)
+                return getattr(self._file, name)
+
+        r = requests.post(httpbin("post"), data=ReadProxy())
+        assert r.status_code == 200
+        assert r.json()["data"] == "streamed body"
+
     @pytest.mark.parametrize(
         "data",
         (
@@ -2072,6 +2098,21 @@ class TestRequests:
             requests.utils.rewind_body(prep)
 
         assert "Unable to rewind request body" in str(e)
+
+    def test_getattr_proxy_stream_follows_redirect(self, httpbin):
+        """Ensure stream wrappers that don't implement __iter__ directly are still detected."""
+
+        class AttrProxy:
+            def __init__(self):
+                self._file = io.BytesIO(b"data")
+
+            def __getattr__(self, name):
+                return getattr(self._file, name)
+
+        r = requests.post(
+            httpbin("redirect-to?url=/post&status_code=307"), data=AttrProxy()
+        )
+        assert r.json()["data"] == "data"
 
     def _patch_adapter_gzipped_redirect(self, session, url):
         adapter = session.get_adapter(url=url)

@@ -37,10 +37,10 @@ from .__version__ import __version__
 
 # to_native_string is unused here, but imported here for backwards compatibility
 from ._internal_utils import (  # noqa: F401
-    _HEADER_VALIDATORS_BYTE,  # type: ignore[reportPrivateUsage]
-    _HEADER_VALIDATORS_STR,  # type: ignore[reportPrivateUsage]
-    HEADER_VALIDATORS,  # type: ignore[reportUnusedImport]
-    to_native_string,  # type: ignore[reportUnusedImport]
+    _HEADER_VALIDATORS_BYTE,
+    _HEADER_VALIDATORS_STR,
+    HEADER_VALIDATORS,
+    to_native_string,
 )
 from ._types import SupportsItems as _SupportsItems
 from .compat import (
@@ -851,9 +851,11 @@ def should_bypass_proxies(url: str, no_proxy: str | None) -> bool:
                 host_with_port += f":{parsed.port}"
 
             for host in no_proxy_hosts:
+                host = host.lstrip(".")
+                if hostname == host or host_with_port == host:
+                    return True
+                host = "." + host
                 if hostname.endswith(host) or host_with_port.endswith(host):
-                    # The URL does match something in no_proxy, so we don't want
-                    # to apply the proxies on this URL.
                     return True
 
     with set_environ("no_proxy", no_proxy_arg):
@@ -1100,7 +1102,7 @@ def _validate_header_part(
 ) -> None:
     if isinstance(header_part, str):
         validator = _HEADER_VALIDATORS_STR[header_validator_index]
-    elif isinstance(header_part, bytes):  # type: ignore[reportUnnecessaryIsInstance]
+    elif isinstance(header_part, bytes):
         # runtime guard for non-str/bytes input
         validator = _HEADER_VALIDATORS_BYTE[header_validator_index]
     else:
@@ -1140,11 +1142,11 @@ def rewind_body(prepared_request: PreparedRequest) -> None:
     """
     body_seek = getattr(prepared_request.body, "seek", None)
     if body_seek is not None and isinstance(
-        prepared_request._body_position,  # type: ignore[reportPrivateUsage]
+        prepared_request._body_position,
         integer_types,
     ):
         try:
-            body_seek(prepared_request._body_position)  # type: ignore[reportPrivateUsage]
+            body_seek(prepared_request._body_position)
         except OSError:
             raise UnrewindableBodyError(
                 "An error occurred when rewinding request body for redirect."
